@@ -1,0 +1,173 @@
+# > PROJECT INFO
+# NAME: INTERGENERATIONAL MOBILITY IN BRAZIL
+# LEAD: LUCAS WARWAR
+#
+# > THIS SCRIPT
+# AIM: LINK FAMILIES - PHASE I 
+# AUTHOR: LUCAS WARWAR
+#
+# > NOTES
+# 1: - LINK MOTHER-CHILD USING MOTHER'S NAME FROM RECEITA
+
+# SETUP -----------------------------------------------
+
+source("code/fun/setup.R")
+
+# LOAD FULL RECEITA'S DATASET -------------------
+
+list.files(path_receita, pattern = ".rds")
+
+receita <- readr::read_rds(paste0(path_receita, "A0_registry.rds"))
+
+# 1.) FIND CHILDREN WHOSE MOTHER HAS A UNIQUE NAME ---------------------
+
+# SELECT COLUNS OF INTEREST
+receita <- collapse::qDT(receita) %>%
+  collapse::fselect(
+    uf, cpf, namea, gend, dtbirth, mothernamea, # PERSONAL INFO
+    idstreet, stdnumber, stdnumber2, stdcompl, stdcompl2, cep, # ADDRESS
+    common_all, ufcommon_all) # NAME'S COMMONESS
+
+# MERGE ATTEMPT 1: MOTHERS WITH UNIQUE NAME IN ALL DATA
+mother_child_1 <- data.table::merge.data.table(
+  collapse::fselect(receita, uf, cep, cpf, namea, mothernamea, dtbirth, gend),
+  collapse::fsubset(receita, common_all == 1)  %>% # UNIQUE NAMES
+    collapse::fselect(cpf, namea),
+  by.x = "mothernamea",
+  by.y = "namea") %>%
+  # RENAME AND SELECT COLUMNS
+  collapse::frename(cpf.x = cpf, cpf.y = mothercpf) %>%
+  collapse::fselect(uf, cep, cpf, namea, gend,
+                    dtbirth, mothernamea, mothercpf) %>%
+  collapse::roworder(cpf)
+
+# SAVE TEMP FILE
+write_rds(mother_child_1,
+          here::here("data", "temp", "A1_motherchild_commonall.rds"),
+          compress = "gz")
+
+# KEEP ONLY CPFs TO SUBSET DATA
+mother_child_1 <- mother_child_1 %>% collapse::fselect(cpf)
+
+# 2.) FIND CHILDREN WHOSE MOTHER LIVES IN SAME ADDRESS --------------
+
+# MERGE ATTEMPT 2: FULL ADDRESS
+mother_child_2 <- data.table::merge.data.table(
+  collapse::fsubset(receita, # EXCLUDE CPFs LINKED IN MERGE 1
+                    cpf %nin% mother_child_1$cpf),
+  collapse::fselect(receita,
+                    cpf, namea, idstreet, stdnumber, stdnumber2,
+                    stdcompl, stdcompl2, cep), # ALL POSSIBLE MATCHES
+  by.x = c("mothernamea", "idstreet", "stdnumber", "stdnumber2",
+           "stdcompl", "stdcompl2", "cep"),
+  by.y = c("namea", "idstreet", "stdnumber", "stdnumber2",
+           "stdcompl", "stdcompl2", "cep")) %>%
+  # RENAME AND SELECT COLUMNS
+  collapse::frename(cpf.x = cpf, cpf.y = mothercpf) %>%
+  collapse::fselect(uf, cep, cpf, namea, gend,
+                    dtbirth, mothernamea, mothercpf) %>%
+  collapse::roworder(cpf)
+
+# MERGE ATTEMPT 3: ADDRESS W/O 2ND NUMBER AND COMPLEMENT
+mother_child_3 <- data.table::merge.data.table(
+  collapse::fsubset(receita, # EXCLUDE CPFs LINKED IN MERGE 1-2
+                    cpf %nin% mother_child_1$cpf &
+                    cpf %nin% mother_child_2$cpf),
+  collapse::fselect(receita,
+                    cpf, namea, idstreet,
+                    stdnumber, stdcompl, cep), # ALL POSSIBLE MATCHES
+  by.x = c("mothernamea", "idstreet", "stdnumber", "stdcompl", "cep"),
+  by.y = c("namea", "idstreet", "stdnumber", "stdcompl", "cep")) %>%
+  # RENAME AND SELECT COLUMNS
+  collapse::frename(cpf.x = cpf, cpf.y = mothercpf) %>%
+  collapse::fselect(uf, cep, cpf, namea, gend,
+                    dtbirth, mothernamea, mothercpf) %>%
+  collapse::roworder(cpf)
+
+# MERGE ATTEMPT 4: ADDRESS W/O COMPLEMENT
+mother_child_4 <- data.table::merge.data.table(
+  collapse::fsubset(receita, # EXCLUDE CPFs LINKED IN MERGE 1-3
+                    cpf %nin% mother_child_1$cpf &
+                    cpf %nin% mother_child_2$cpf &
+                    cpf %nin% mother_child_3$cpf),
+  collapse::fselect(receita, # ALL POSSIBLE MATCHES
+                    cpf, namea, idstreet, stdnumber, cep),
+  by.x = c("mothernamea", "idstreet", "stdnumber", "cep"),
+  by.y = c("namea", "idstreet", "stdnumber", "cep")) %>%
+  # RENAME AND SELECT COLUMNS
+  collapse::frename(cpf.x = cpf, cpf.y = mothercpf) %>%
+  collapse::fselect(uf, cep, cpf, namea, gend,
+                    dtbirth, mothernamea, mothercpf) %>%
+  collapse::roworder(cpf)
+
+# MERGE ATTEMPT 5: ADDRESS W/O NUMBER
+mother_child_5 <- data.table::merge.data.table(
+  collapse::fsubset(receita, # EXCLUDE CPFs LINKED IN MERGE 1-4
+                    cpf %nin% mother_child_1$cpf &
+                    cpf %nin% mother_child_2$cpf &
+                    cpf %nin% mother_child_3$cpf &
+                    cpf %nin% mother_child_4$cpf),
+  collapse::fselect(receita, # ALL POSSIBLE MATCHES
+                    cpf, namea, idstreet, cep),
+  by.x = c("mothernamea", "idstreet", "cep"),
+  by.y = c("namea", "idstreet", "cep")) %>%
+  # RENAME AND SELECT COLUMNS
+  collapse::frename(cpf.x = cpf, cpf.y = mothercpf) %>%
+  collapse::fselect(uf, cep, cpf, namea, gend,
+                    dtbirth, mothernamea, mothercpf) %>%
+  collapse::roworder(cpf)
+
+# MERGE ATTEMPT 6: ADDRESS ONLY CEP
+mother_child_6 <- data.table::merge.data.table(
+  collapse::fsubset(receita, # EXCLUDE CPFs LINKED IN MERGE 1-4
+                    cpf %nin% mother_child_1$cpf &
+                    cpf %nin% mother_child_2$cpf &
+                    cpf %nin% mother_child_3$cpf &
+                    cpf %nin% mother_child_4$cpf &
+                    cpf %nin% mother_child_5$cpf),
+  collapse::fselect(receita, # ALL POSSIBLE MATCHES
+                    cpf, namea, cep),
+  by.x = c("mothernamea", "cep"),
+  by.y = c("namea", "cep")) %>%
+  # RENAME AND SELECT COLUMNS
+  collapse::frename(cpf.x = cpf, cpf.y = mothercpf) %>%
+  collapse::fselect(uf, cep, cpf, namea, gend,
+                    dtbirth, mothernamea, mothercpf) %>%
+  collapse::roworder(cpf)
+
+# BIND ROWS ADDRESS' MERGE BATCH (2-6)
+mother_child_address <- data.table::rbindlist(
+  list(mother_child_2, mother_child_3, mother_child_4,
+       mother_child_5, mother_child_6))
+
+rm(mother_child_3, mother_child_4, mother_child_5, mother_child_6)
+
+# SAVE TEMP FILE
+write_rds(collapse::roworder(mother_child_address, cpf),
+          here::here("data", "temp", "A1_motherchild_address.rds"),
+          compress = "gz")
+
+# KEEP ONLY CPFs TO SUBSET DATA
+mother_child_address <- mother_child_address %>% collapse::fselect(cpf)
+
+# 3.) FIND CHILDREN WHOSE MOTHER HAS UNIQUE NAME IN UF --------------
+
+# MERGE ATTEMPT 7: MOTHERS WITH UNIQUE NAME IN ALL DATA
+mother_child_7 <- data.table::merge.data.table(
+  collapse::fsubset(receita,
+                    cpf %nin% mother_child_1$cpf &
+                    cpf %nin% mother_child_address$cpf),
+  collapse::fsubset(receita, uf, ufcommon_all == 1)  %>% # UNIQUE NAMES
+    collapse::fselect(cpf, uf, namea),
+  by.x = c("mothernamea", "uf"),
+  by.y = "namea", "uf") %>%
+  # RENAME AND SELECT COLUMNS
+  collapse::frename(cpf.x = cpf, cpf.y = mothercpf) %>%
+  collapse::fselect(uf, cep, cpf, namea, gend,
+                    dtbirth, mothernamea, mothercpf) %>%
+  collapse::roworder(cpf)
+
+# SAVE TEMP FILE
+write_rds(mother_child_7,
+          here::here("data", "temp", "A1_motherchild_ufcommonall.rds"),
+          compress = "gz")

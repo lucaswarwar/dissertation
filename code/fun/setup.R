@@ -17,12 +17,6 @@
 Sys.setenv(TZ = "UTC") # LOCAL TIME ZONE
 options(scipen = 99999) # DISABLE SCIENTIFIC NOTATION
 
-# FUNCTIONS -------------------------------------------
-
-`%nin%` <- Negate(`%in%`)
-
-`%nlike%` <- Negate(`%like%`)
-
 # LIBRARIES -------------------------------------------
 
 # DIRECTORY AND FILE MANAGEMENT
@@ -102,5 +96,11 @@ library(purrr) # FUNCIONAL PROGRAMING
 library(furrr) # VECTORIZE OPERATIONS
 library(parallel) # OPTIMIZE OPERATIONS
 library(future) # MORE PARALLELIZATION
+
+# FUNCTIONS -------------------------------------------
+
+`%nin%` <- Negate(`%in%`)
+
+`%nlike%` <- Negate(`%like%`)
 
 # END OF SCRIPT ------------------------------------------
