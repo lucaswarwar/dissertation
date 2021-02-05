@@ -3,11 +3,11 @@
 # LEAD: LUCAS WARWAR
 #
 # > THIS SCRIPT
-# AIM: LINK FAMILIES - PHASE I 
+# AIM: LINK FAMILIES - PHASE I - RECEITA
 # AUTHOR: LUCAS WARWAR
 #
 # > NOTES
-# 1: - LINK MOTHER-CHILD USING MOTHER'S NAME FROM RECEITA
+# A1: - LINK MOTHER-CHILD USING MOTHER'S NAME FROM RECEITA
 
 # SETUP -----------------------------------------------
 
@@ -157,7 +157,7 @@ mother_child_7 <- data.table::merge.data.table(
   collapse::fsubset(receita,
                     cpf %nin% mother_child_1$cpf &
                     cpf %nin% mother_child_address$cpf),
-  collapse::fsubset(receita, uf, ufcommon_all == 1)  %>% # UNIQUE NAMES
+  collapse::fsubset(receita, ufcommon_all == 1)  %>% # UNIQUE NAMES
     collapse::fselect(cpf, uf, namea),
   by.x = c("mothernamea", "uf"),
   by.y = "namea", "uf") %>%
@@ -171,3 +171,14 @@ mother_child_7 <- data.table::merge.data.table(
 write_rds(mother_child_7,
           here::here("data", "temp", "A1_motherchild_ufcommonall.rds"),
           compress = "gz")
+
+# 5.) COMBINE FILES AND SAVE PHASE 1A
+files <- list.files(here::here("data", "temp"))
+
+mother_child_receita <- purrr::map(files, readr::read_rds) %>%
+  data.table::rbindlist() %>%
+  collapse::roworder(cpf) %>%
+  readr::write_rds(here::here("data", "temp", "A1_motherchild_receita.rds"),
+                   compress = "gz")
+
+file.remove(paste0("data/temp/", files))
