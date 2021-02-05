@@ -19,7 +19,9 @@ list.files(path_receita, pattern = ".rds")
 
 # PEOPLE FILLED AS DEPENDENT FROM 2006 - 2017
 dependents <- readr::read_rds(paste0(path_receita, "A0_dependents.rds")) %>%
-    collapse::qDT()
+    collapse::qDT() %>%
+    collapse::ftransform(cpf = bit64::as.integer64.double(cpf),
+                         dep_cpf = bit64::as.integer64.double(dep_cpf))
 
 # FULL RECEITA'S DATASET
 receita <- readr::read_rds(paste0(path_receita, "A0_registry.rds"))
@@ -29,22 +31,9 @@ receita <- collapse::qDT(receita) %>%
   collapse::fselect(
     uf, cep, cpf, namea, gend, dtbirth, mothernamea) # PERSONAL INFO
 
-# MERGE ATTEMPT 1: NAME, DTBIRTH AND CPF
+# MERGE ATTEMPT 1: NAME AND CPF
 father_child_1 <- data.table::merge.data.table(
     receita,
-    collapse::fselect(dependents, -year) %>%
-        collapse::funique(),
-    by.x = c("cpf", "namea", "dtbirth"),
-    by.y = c("dep_cpf", "dep_namea", "dep_dtbirth")) %>%
-    collapse::frename(cpf.x = cpf, cpf.y = fathercpf) %>%
-    collapse::fselect(uf, cep, cpf, namea, gend, dtbirth,
-                      mothernamea, fathercpf, dep_type) %>%
-    collapse::roworder(cpf)
-
-# MERGE ATTEMPT 2: NAME AND CPF
-father_child_2 <- data.table::merge.data.table(
-    collapse::fsubset(receita,
-                      cpf %nin% father_child_1$cpf),
     collapse::fselect(dependents, -year, -dep_dtbirth) %>%
         collapse::funique(),
     by.x = c("cpf", "namea"),
@@ -54,11 +43,10 @@ father_child_2 <- data.table::merge.data.table(
                       mothernamea, fathercpf, dep_type) %>%
     collapse::roworder(cpf)
 
-# MERGE ATTEMPT 3: ONLY CPF
-father_child_3 <- data.table::merge.data.table(
+# MERGE ATTEMPT 2: ONLY CPF
+father_child_2 <- data.table::merge.data.table(
     collapse::fsubset(receita,
-                      cpf %nin% father_child_1$cpf &
-                      cpf %nin% father_child_2$cpf),
+                      cpf %nin% father_child_1$cpf),
     collapse::fselect(dependents, -year, -dep_dtbirth, -dep_namea) %>%
         collapse::funique(),
     by.x = "cpf",
@@ -70,9 +58,9 @@ father_child_3 <- data.table::merge.data.table(
 
 # BIND ROWS DEPENDENTS' MERGE BATCH (1-3)
 father_child_dep <- data.table::rbindlist(
-  list(father_child_1, father_child_2, father_child_3))
+  list(father_child_1, father_child_2))
 
-rm(father_child_1, father_child_2, father_child_3)
+rm(father_child_1, father_child_2)
 
 # LOAD PEOPLE LINKED WITH THEIR MOTHERS IN PHASE 1A
 mother_child <- readr::read_rds(
